@@ -1,7 +1,8 @@
-# Verify that WebGoat and close.sh are present
+# Verify that WebGoat, java and close.sh are present
 include:
   - webgoat
   - iptables
+  - java
 
 # Run close.sh to only allow traffic from virtual network
 close_iptables:
