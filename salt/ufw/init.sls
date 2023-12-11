@@ -1,2 +1,0 @@
-ufw:
-  pkg.installed
