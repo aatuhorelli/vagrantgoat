@@ -75,5 +75,73 @@ Virtuaalikoneelle ei ole tarvetta kirjautua Vagrantin kautta kertaakaan.
 
 Kun virtuaalikone on käynnistynyt, se tavoittelee saltin kautta isäntälaitteen ip-osoitetta. Komento ``$ sudo salt-key`` tuo esiin listan hyväksytyistä ja hyväksymättömistä avaimista. Hyväksyn orjan 'webgoat' avaimen: ``$ sudo salt-key -A # (y/n) -> Y)``. 
 
-![Add file: salt key]
+![Add file: salt key](/img/saltkey.png)
 > Virtuaalikone webgoat onnistuneesti pystytetty ja avain hyväksytty.
+
+### Top.sls 
+
+Hakemiston sisältö:
+
+````
+$ ls /srv/salt                                                                                                                                                  
+iptables  java  run  top.sls  webgoat
+````
+
+top.sls-tiedostossa määritellään, mitkä tilat orjille ajetaan komennolla ``$ sudo salt '*' state.apply``. Tässä versiossa orjia on vain yhdenlaisia, mutta siitä huolimatta tiedostoon on määritelty, että seuraavat tilat ajetaan vain webgoat-alkuisille orjille.
+
+````
+$ cat top.sls 
+base:
+  'webgoat*':
+    - java # Asentaa jdk-17-jre:n
+    - webgoat # Lataa webgoatin masterin /srv/salt/webgoat/-hakemistosta
+    - iptables # Luo close.sh-tiedoston /srv/salt/iptables/-hakemiston esimerkkitiedoston pohjalta
+````
+
+Iptables-hakemistossa on iptablesin sääntöjä määrittävä shell-skripti, jota käytetään lähdetiedostona minionille siirrettävälle tiedostolle. 
+
+Init.sls ja closed_iptables.sh-tiedostojen sisältö:
+````
+$ cat /srv/salt/iptables/init.sls 
+/usr/local/bin/close.sh:
+  file.managed:
+    - source: salt://iptables/closed_iptables.sh
+    - mode: "755"
+
+$ cat closed_iptables.sh 
+#!/usr/bin/bash
+sudo iptables -P INPUT DROP
+sudo iptables -P FORWARD DROP
+sudo iptables -P OUTPUT DROP
+sudo iptables -A INPUT -i lo -j ACCEPT
+sudo iptables -A INPUT -s 192.168.58.0/24 -j ACCEPT
+sudo iptables -A OUTPUT -o lo -j ACCEPT
+sudo iptables -A OUTPUT -d 192.168.58.0/24 -j ACCEPT
+````
+Valtaosa projektiin käytetystä ajasta kului miettiessä järkevää tapaa toteuttaa palomuurisäännöt, koska niiden asettaminen esti myös Vagrant ssh:n käytön ja johti usein koneen tuhoamiseen ja uudelleenpystyttämiseen. Käytin iptablesia siitä syystä, että sen säännöt eivät säily uudelleenkäynnistyksen yli, joten ``$ vagrant reload`` sallii taas koneelle pääsyn SSH:n avulla. Säännöt estävät oletuksena kaiken liikenteen, paitsi localhostiin ja virtuaalikoneiden aliverkkoon.
+
+
+Java- ja webgoat-hakemistojen init.sls:n sisältö on hyvin yksinkertainen. Paketti openjdk-17-jre asennetaan, jos sitä ei vielä ole olemassa. 
+
+````
+$ cat /srv/salt/java/init.sls 
+# Install Java Runtime Environment
+openjdk-17-jre:
+  pkg.installed 
+````
+Webgoat/init.sls lataa tarvittaessa webgoat.jar-tiedoston isäntälaitteelta orjan vagrant-käyttäjän kotihakemistoon.
+````
+$ cat /srv/salt/webgoat/init.sls 
+# Download webgoat
+/home/vagrant/webgoat.jar:
+  file.managed:
+    - source: salt://webgoat/webgoat-2023.4.jar
+````
+
+Top.sls-tiedostossa määriteltyjen pakettien asennus webgoatille tapahtuu komennolla ``$ sudo salt '*' state.apply``. Lataus kestää hetken Java-paketin koosta johtuen. 
+
+![Add file: top asennus](/img/top.png)
+> Onnistunut asennus. Succeeded: 3 (changed=3).
+
+
+
