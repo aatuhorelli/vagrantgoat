@@ -1,2 +1,2 @@
 # vagrantgoat
-Quickly init a new virtualmachine with Java runtime environment, WebGoat and ufw installed and configured.
+WebGoatin pystyttäminen virtuaalikoneelle Vagrantin, Saltin ja Javan avulla. Palvelin sallii liikenteen vain virtuaaliverkosta WebGoatin käynnistyttyä. 
