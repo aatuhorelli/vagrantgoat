@@ -144,4 +144,35 @@ Top.sls-tiedostossa määriteltyjen pakettien asennus webgoatille tapahtuu komen
 > Onnistunut asennus. Succeeded: 3 (changed=3).
 
 
+## Käyttö - state.apply run
+
+WebGoatin ajo on eriytetty omaan komeentoonsa 'run', sillä se jää pyörimään terminaaliin, eikä täten palauta ilmoitusta suorituksen onnistumisesta. Runin init.sls olisi yksinään riittävä suorittamaan asennukset ja palvelun käynnistämisen. 
+
+/srv/run/init.sls sisältö:
+````
+# Verify that WebGoat, java  and close.sh are present
+include: 
+  - webgoat
+  - iptables
+  - java
+
+# Run close.sh to only allow traffic from virtual network
+close_iptables:
+  cmd.run:
+    - name: "close.sh"
+
+# Run WebGoat, unless the process is already running
+webgoat_start:
+  cmd.run:
+    - name: "java -Dfile.encoding=UTF-8 -Dserver.address=192.168.58.100 -Dwebgoat.port=8888 -Dwebwolf.port=9090 -jar /home/vagrant/webgoat.jar"
+    - unless: "ps aux | grep '[j]ava'" # ylempi komento suoritetaan vain, jos prosessi java ei pyöri.
+````
+Hakasulkuja käytetty grep '[j]ava' ympärillä siitä syystä, että muussa tapauksessa ``$ ps aux`` palauttaa aina True löytäessään myös oman prosessinsa. Vastaus löytyi StackOverflowsta, linkkiä keskusteluun en onnistunut enää kaivamaan sivuhistoriasta. Lisään sen, jos löydän. Tämä init.sls ajaa ensin tilat webgoat, iptables ja java, minkä jälkeen rajoitta orjan liikennettä shell-skriptillä ja lopuksi käynnistää WebGoatin.
+
+Totesin myös käyttäjäystävälliseksi ratkaisuksi ajaa state.applyn aynkronoidusti taustalla välttyäkseni turhalta odotukselta. Komento käynnistää prosessin, joka jää terminaaliin pyörimään, eikä täten palauta kuittausta onnistumisestaan. ``$ sudo salt '*' state.apply run --async``.
+
+![Add file: run](/img/run.png)
+> WebGoat elää!
+
+WebGoat herää henkiin ja on käytettävissä. Orjaan ei saa enää yhteyttä ssh:lla, mutta sen uudelleenkäynnistäminen Vagrantilla ``$ vagrant reload`` poistaa myös palomuurisäännöt, jolloin ssh:n käyttö on taas mahdollista.
 
